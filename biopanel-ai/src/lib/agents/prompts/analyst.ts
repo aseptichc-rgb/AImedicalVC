@@ -80,7 +80,19 @@ ${JSON.stringify(enrichedData, null, 2)}
    - 각 카탈리스트의 주가 영향 추정(Event-driven 분석)
    - De-risking 이벤트 순서 및 투자 진입 시점 추천
 
-6. **투자 의견 (Investment Thesis)**
+6. **뉴스 및 시장 센티먼트 분석 (News & Market Sentiment)**
+   - 제공된 news 데이터를 기반으로 최근 3개월 간 주요 뉴스 동향 분석
+   - 긍정/부정 뉴스 비율 및 전반적 시장 센티먼트 평가
+   - 경쟁사 대비 미디어 노출도와 투자자 관심도
+   - 주요 이벤트(학회 발표, FDA 결정, 딜 발표) 후 시장 반응
+   - 뉴스에서 드러나는 시장의 기대치와 현재 밸류에이션의 정합성
+
+7. **FDA 승인 이력과 투자 영향 (FDA History & Investment Impact)**
+   - 제공된 fdaEvents 데이터를 기반으로 규제 트랙레코드 평가
+   - 과거 승인 성공 시 주가 반응 패턴
+   - 규제 리스크가 밸류에이션에 미치는 할인 효과 분석
+
+8. **투자 의견 (Investment Thesis)**
    - Bear Case: 주요 리스크 시나리오 및 목표가
    - Base Case: 가장 가능성 높은 시나리오 및 목표가
    - Bull Case: 최적 시나리오 및 목표가

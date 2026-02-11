@@ -10,6 +10,7 @@ import { callClaude } from '../utils/claude';
 import { aggregateAgentScores, calculateOverallScore } from './evaluation/scoring';
 import { synthesizeReport } from './evaluation/synthesis';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { EnrichedData } from '@/types/analysis';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,16 +21,6 @@ export interface CompanyInput {
   ticker?: string;
   sector: string;
   description?: string;
-}
-
-export interface EnrichedData {
-  clinicalTrials?: any[];
-  financials?: any;
-  patents?: any[];
-  news?: any[];
-  publications?: any[];
-  competitors?: any[];
-  [key: string]: any;
 }
 
 export interface OrchestrationProgress {
@@ -118,11 +109,13 @@ async function enrichData(company: CompanyInput): Promise<EnrichedData> {
   // For now, return a minimal shell that downstream prompts can handle.
   return {
     clinicalTrials: [],
-    financials: {},
-    patents: [],
-    news: [],
-    publications: [],
+    recentPapers: [],
+    financials: undefined,
     competitors: [],
+    regulatoryHistory: [],
+    news: [],
+    fdaEvents: [],
+    digitalHealthData: undefined,
   };
 }
 
@@ -138,7 +131,7 @@ async function runIndependentAnalysis(
   const agent = getAgent(agentId);
   const prompt = buildPrompt(agentId, company, enrichedData, 'independent_analysis');
 
-  const { content, usage } = await callClaude(
+  const { content, tokenCount } = await callClaude(
     `당신은 ${agent.name} (${agent.nameEn})입니다. ${agent.title}`,
     prompt
   );
@@ -148,7 +141,7 @@ async function runIndependentAnalysis(
   return {
     narrative: content,
     structured,
-    tokenCount: usage?.output_tokens || 0,
+    tokenCount,
   };
 }
 
@@ -202,7 +195,7 @@ ${conflictSection}
 }
 \`\`\``;
 
-  const { content, usage } = await callClaude(
+  const { content, tokenCount } = await callClaude(
     `당신은 ${agent.name} (${agent.nameEn})입니다. ${agent.title}. 다른 전문가들과 교차 검토 토론 중입니다.`,
     prompt
   );
@@ -221,7 +214,7 @@ ${conflictSection}
   return {
     content,
     agreementLevel,
-    tokenCount: usage?.output_tokens || 0,
+    tokenCount,
   };
 }
 
@@ -270,7 +263,7 @@ ${rebuttal.content.substring(0, 1500)}...
 }
 \`\`\``;
 
-  const { content, usage } = await callClaude(
+  const { content, tokenCount } = await callClaude(
     `당신은 ${agent.name} (${agent.nameEn})입니다. ${agent.title}. 최종 투자 의견을 제시합니다.`,
     prompt
   );
@@ -280,7 +273,7 @@ ${rebuttal.content.substring(0, 1500)}...
   return {
     content,
     structured,
-    tokenCount: usage?.output_tokens || 0,
+    tokenCount,
   };
 }
 
@@ -547,16 +540,22 @@ export async function orchestrate(
     finalReport.dimensionScores = aggregatedScores;
 
     // Add individual agent verdicts to the report
-    finalReport.agentVerdicts = verdictResults.map((v) => ({
-      agentId: v.agentId,
-      agentName: getAgent(v.agentId).name,
-      agentNameEn: getAgent(v.agentId).nameEn,
-      content: v.verdict.content,
-      scores: v.verdict.structured.scores,
-      keyFindings: v.verdict.structured.keyFindings,
-      risks: v.verdict.structured.risks,
-      opportunities: v.verdict.structured.opportunities,
-    }));
+    finalReport.agentVerdicts = verdictResults.map((v) => {
+      const avgScore = Object.values(v.verdict.structured.scores).reduce((a, b) => a + b, 0) /
+        Math.max(Object.values(v.verdict.structured.scores).length, 1);
+      const verdictType = avgScore >= 80 ? 'strong_positive' :
+        avgScore >= 60 ? 'positive' :
+        avgScore >= 40 ? 'neutral' :
+        avgScore >= 20 ? 'negative' : 'strong_negative';
+      return {
+        agentId: v.agentId,
+        agentName: getAgent(v.agentId).name,
+        verdict: verdictType as 'strong_positive' | 'positive' | 'neutral' | 'negative' | 'strong_negative',
+        summary: v.verdict.content.substring(0, 500),
+        keyArgument: v.verdict.structured.keyFindings[0] || '',
+        confidenceLevel: Math.round(avgScore),
+      };
+    });
 
     // Write final report to Firestore
     await db.collection('sessions').doc(sessionId).update({

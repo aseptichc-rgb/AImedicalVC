@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { AgentId, AnalysisPhase } from '@/types/agent';
 import { AgreementLevel } from '@/types/agent';
 import Badge from '@/components/ui/Badge';
@@ -48,12 +49,12 @@ const AGREEMENT_CONFIG: Record<AgreementLevel, { label: string; color: string }>
  * Renders markdown-like content as safe HTML paragraphs.
  * Supports: paragraphs (double newline), bold (**text**), and single line breaks.
  */
-function renderMarkdownContent(content: string): JSX.Element[] {
+function renderMarkdownContent(content: string): React.ReactElement[] {
   const paragraphs = content.split(/\n{2,}/);
 
   return paragraphs.map((paragraph, idx) => {
     // Convert **bold** to <strong>
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     const boldRegex = /\*\*(.*?)\*\*/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -75,7 +76,7 @@ function renderMarkdownContent(content: string): JSX.Element[] {
     }
 
     // Handle single line breaks within the paragraph
-    const finalParts: (string | JSX.Element)[] = [];
+    const finalParts: (string | React.ReactElement)[] = [];
     parts.forEach((part, partIdx) => {
       if (typeof part === 'string') {
         const lines = part.split('\n');

@@ -93,7 +93,13 @@ ${JSON.stringify(enrichedData, null, 2)}
    - 특허 도전(Patent Challenge) 리스크: IPR, PGR, Hatch-Waxman
    - 경쟁사 특허와의 관계 및 침해 가능성
 
-7. **종합 과학적 의견 (Scientific Verdict)**
+7. **과학 뉴스 및 학술 동향 분석 (Scientific News & Academic Trends)**
+   - 제공된 news 데이터 및 recentPapers에서 관련 학술 동향 분석
+   - 최신 논문이나 학회 발표에서 드러나는 과학적 진전
+   - 경쟁 기술 플랫폼이나 타겟에 대한 최신 연구 동향
+   - 해당 분야의 과학적 패러다임 변화 가능성
+
+8. **종합 과학적 의견 (Scientific Verdict)**
    - 이 약물의 과학적 기반이 임상 성공을 뒷받침할 수 있는지에 대한 솔직한 평가
    - 과학적 관점에서의 차별화 수준(Differentiation Level)
    - 가장 큰 과학적 리스크와 불확실성

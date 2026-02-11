@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Header from '@/components/layout/Header';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import PDFUploader from '@/components/analysis/PDFUploader';
 import { useAnalysis } from '@/hooks/useAnalysis';
 import { AGENT_REGISTRY } from '@/lib/agents/registry';
 import { AgentId } from '@/types/agent';
@@ -27,15 +28,56 @@ export default function NewAnalysisPage() {
   const [sector, setSector] = useState('');
   const [ticker, setTicker] = useState('');
   const [description, setDescription] = useState('');
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [pdfFileName, setPdfFileName] = useState<string | null>(null);
+  const [pdfAnalyzing, setPdfAnalyzing] = useState(false);
+  const [pdfAnalysis, setPdfAnalysis] = useState<any>(null);
+
+  const handlePdfUpload = async (file: File, base64: string) => {
+    setPdfBase64(base64);
+    setPdfFileName(file.name);
+
+    if (companyName && sector) {
+      setPdfAnalyzing(true);
+      try {
+        const res = await fetch('/api/pdf/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pdfBase64: base64,
+            companyName,
+            sector,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setPdfAnalysis(data.analysis);
+          if (data.analysis?.summary && !description) {
+            setDescription(data.analysis.summary);
+          }
+        }
+      } catch (err) {
+        console.error('PDF analysis error:', err);
+      } finally {
+        setPdfAnalyzing(false);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim() || !sector) return;
+
+    const enrichedDescription = pdfAnalysis
+      ? `${description}\n\n[IR 자료 분석 결과]\n${JSON.stringify(pdfAnalysis, null, 2)}`
+      : description.trim();
+
     await startAnalysis({
       name: companyName.trim(),
       sector,
       ticker: ticker.trim() || undefined,
-      description: description.trim() || undefined,
+      description: enrichedDescription || undefined,
     });
   };
 
@@ -106,6 +148,39 @@ export default function NewAnalysisPage() {
                     placeholder="예: MRNA, 207940.KS"
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
+                </div>
+
+                {/* IR PDF Upload */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    IR 자료 업로드 (선택)
+                  </label>
+                  <PDFUploader
+                    onUpload={handlePdfUpload}
+                    isAnalyzing={pdfAnalyzing}
+                  />
+                  {pdfAnalysis && (
+                    <div className="mt-3 p-4 rounded-xl bg-green-50 border border-green-200">
+                      <div className="flex items-start gap-2">
+                        <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-green-800">IR 자료 분석 완료</p>
+                          <p className="text-xs text-green-700 mt-1">{pdfAnalysis.summary?.substring(0, 150)}...</p>
+                          {pdfAnalysis.keyMetrics && Object.keys(pdfAnalysis.keyMetrics).length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {Object.entries(pdfAnalysis.keyMetrics).slice(0, 4).map(([key, value]) => (
+                                <span key={key} className="inline-block px-2 py-1 rounded-md bg-green-100 text-xs text-green-800">
+                                  {key}: {String(value)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Description */}

@@ -88,7 +88,19 @@ ${JSON.stringify(enrichedData, null, 2)}
    - 라벨링(Labeling) 관련 제한사항 예상
    - Pediatric Study Plan 요구 여부
 
-6. **종합 규제 의견 (Regulatory Verdict)**
+6. **FDA 이벤트 이력 분석 (FDA Event History Analysis)**
+   - 제공된 fdaEvents 데이터를 기반으로 과거 FDA 상호작용 이력 분석
+   - 과거 약물/기기 승인 이력이 있는 경우 그 성공 패턴 평가
+   - Warning Letter나 리콜 이력이 있는 경우 그 영향과 개선 조치 평가
+   - FDA와의 과거 관계가 현재 파이프라인 승인에 미치는 영향
+
+7. **최신 규제 뉴스 분석 (Regulatory News Analysis)**
+   - 제공된 news 데이터 중 'regulatory' 카테고리 뉴스 분석
+   - 최근 규제 관련 발표나 변화가 승인 전략에 미치는 영향
+   - 경쟁사의 규제 승인/거절 소식이 해당 기업에 주는 시사점
+   - 시장 및 투자자들의 규제 기대치 평가
+
+8. **종합 규제 의견 (Regulatory Verdict)**
    - 승인 확률에 대한 솔직한 평가 (Phase별)
    - 예상 승인 일정(Timeline)
    - 가장 큰 규제 리스크와 이에 대한 완화 전략 제언

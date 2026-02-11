@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { useAuth } from '@/hooks/useAuth';
-import { getUserAnalyses, convertTimestamp } from '@/lib/firebase/firestore';
+import { getAllAnalyses, convertTimestamp } from '@/lib/firebase/firestore';
 import { AnalysisDoc, AnalysisStatus } from '@/types/analysis';
 
 const statusConfig: Record<AnalysisStatus, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'purple' }> = {
@@ -22,22 +20,13 @@ const statusConfig: Record<AnalysisStatus, { label: string; variant: 'default' |
 };
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
   const [analyses, setAnalyses] = useState<AnalysisDoc[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
     async function fetchAnalyses() {
-      if (!user) return;
       try {
-        const data = await getUserAnalyses(user.uid);
+        const data = await getAllAnalyses();
         setAnalyses(data);
       } catch (error) {
         console.error('Failed to fetch analyses:', error);
@@ -45,18 +34,8 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
-    if (user) {
-      fetchAnalyses();
-    }
-  }, [user]);
-
-  if (authLoading || (!user && !authLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
+    fetchAnalyses();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -68,7 +47,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-sm text-gray-500 mt-1">
-              {user?.displayName}님의 분석 히스토리
+              분석 히스토리
             </p>
           </div>
           <Link href="/analysis/new">

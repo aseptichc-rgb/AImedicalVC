@@ -1,3 +1,4 @@
+import React from 'react';
 import { ExpertDoc, ConsultMethod } from '@/types/expert';
 import { formatCurrency } from '@/lib/utils/format';
 import Badge from '@/components/ui/Badge';
@@ -64,7 +65,7 @@ function StarRating({ rating, count }: { rating: number; count: number }) {
   );
 }
 
-const CONSULT_METHOD_MAP: Record<ConsultMethod, { label: string; icon: JSX.Element }> = {
+const CONSULT_METHOD_MAP: Record<ConsultMethod, { label: string; icon: React.ReactElement }> = {
   video: {
     label: '화상통화',
     icon: (

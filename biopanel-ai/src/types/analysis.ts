@@ -4,6 +4,17 @@ import { FinalReport } from './report';
 
 export type AnalysisStatus = 'enriching' | 'analyzing' | 'debating' | 'synthesizing' | 'completed' | 'failed';
 
+export type EnrichmentStepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+export interface EnrichmentStepData {
+  id: string;
+  label: string;
+  description: string;
+  icon: 'news' | 'pdf' | 'fda' | 'clinical' | 'pubmed' | 'financial' | 'competitor' | 'digital';
+  status: EnrichmentStepStatus;
+  result?: string;
+}
+
 export interface AnalysisDoc {
   id: string;
   userId: string;
@@ -12,6 +23,7 @@ export interface AnalysisDoc {
   currentPhase: string;
   progress: number;
   enrichedData?: EnrichedData;
+  enrichmentSteps?: EnrichmentStepData[];
   report?: FinalReport;
   createdAt: Date;
   completedAt?: Date;
@@ -25,6 +37,9 @@ export interface EnrichedData {
   financials?: FinancialSummary;
   competitors: CompetitorInfo[];
   regulatoryHistory: RegulatoryEvent[];
+  news: NewsArticle[];
+  fdaEvents: FDAEvent[];
+  digitalHealthData?: DigitalHealthInfo;
 }
 
 export interface ClinicalTrialSummary {
@@ -68,6 +83,44 @@ export interface RegulatoryEvent {
   agency: string;
   event: string;
   outcome: string;
+}
+
+export type NewsCategory = 'clinical' | 'regulatory' | 'business' | 'digital_health' | 'general';
+
+export interface NewsArticle {
+  id: string;
+  title: string;
+  source: string;
+  publishedAt: string;
+  url: string;
+  snippet?: string;
+  category: NewsCategory;
+}
+
+export type FDAEventType = 'drug_approval' | 'device_510k' | 'warning_letter' | 'recall' | 'breakthrough';
+
+export interface FDAEvent {
+  id: string;
+  type: FDAEventType;
+  date: string;
+  product?: string;
+  applicant: string;
+  decision?: string;
+  indication?: string;
+  documentUrl?: string;
+}
+
+export interface DigitalHealthClearance {
+  type: '510k' | 'De Novo' | 'PMA' | 'Exempt';
+  clearanceNumber?: string;
+  date?: string;
+  productCode?: string;
+  deviceName?: string;
+}
+
+export interface DigitalHealthInfo {
+  fdaClearances: DigitalHealthClearance[];
+  certifications: string[];
 }
 
 export interface MessageDoc {

@@ -42,6 +42,16 @@ export async function getUserAnalyses(userId: string) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AnalysisDoc));
 }
 
+export async function getAllAnalyses() {
+  const q = query(
+    collection(db, 'analyses'),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AnalysisDoc));
+}
+
 export function subscribeToAnalysis(sessionId: string, callback: (data: AnalysisDoc) => void) {
   return onSnapshot(doc(db, 'analyses', sessionId), (snap) => {
     if (snap.exists()) {

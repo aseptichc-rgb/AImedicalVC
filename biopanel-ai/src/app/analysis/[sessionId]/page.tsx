@@ -1,12 +1,13 @@
 'use client';
 
-import { use } from 'react';
+import { use, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Button from '@/components/ui/Button';
+import EnrichmentProgress from '@/components/analysis/EnrichmentProgress';
 import { useDebateStream } from '@/hooks/useDebateStream';
 import { AGENT_REGISTRY } from '@/lib/agents/registry';
 import { AgentId, AnalysisPhase } from '@/types/agent';
@@ -52,7 +53,52 @@ interface PageProps {
 
 export default function DebateViewPage({ params }: PageProps) {
   const { sessionId } = use(params);
-  const { messages, status, progress, currentPhase, conflicts, report } = useDebateStream(sessionId);
+  const { messages, status, progress, currentPhase, conflicts, report, enrichmentSteps, company } = useDebateStream(sessionId);
+  const enrichTriggered = useRef(false);
+  const runTriggered = useRef(false);
+
+  // Debug: Log status changes
+  useEffect(() => {
+    console.log('[Analysis] Status:', status, '| Company:', company?.name, '| Progress:', progress);
+  }, [status, company, progress]);
+
+  // Trigger enrichment when status is 'enriching' and company data is available
+  useEffect(() => {
+    console.log('[Analysis] Checking enrichment trigger - status:', status, 'company:', !!company, 'triggered:', enrichTriggered.current);
+    if (status === 'enriching' && company && !enrichTriggered.current) {
+      enrichTriggered.current = true;
+      console.log('[Analysis] Starting enrichment for:', company.name);
+      fetch('/api/analysis/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, company }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log('[Analysis] Enrichment response:', data);
+        })
+        .catch((err) => console.error('[Analysis] Enrichment error:', err));
+    }
+  }, [status, company, sessionId]);
+
+  // Trigger analysis run when status changes to 'analyzing'
+  useEffect(() => {
+    console.log('[Analysis] Checking run trigger - status:', status, 'company:', !!company, 'triggered:', runTriggered.current);
+    if (status === 'analyzing' && company && !runTriggered.current) {
+      runTriggered.current = true;
+      console.log('[Analysis] Starting AI analysis for:', company.name);
+      fetch('/api/analysis/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, company }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log('[Analysis] AI analysis response:', data);
+        })
+        .catch((err) => console.error('[Analysis] Run error:', err));
+    }
+  }, [status, company, sessionId]);
 
   const agentIds: AgentId[] = ['oncologist', 'pharmacist', 'analyst', 'regulatory', 'immunologist'];
 
@@ -249,14 +295,22 @@ export default function DebateViewPage({ params }: PageProps) {
           <div className="lg:col-span-3">
             <div className="space-y-6">
               {messages.length === 0 && status !== 'completed' && (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <LoadingSpinner size="lg" />
-                  <p className="text-sm text-gray-500 mt-4">
-                    {status === 'enriching'
-                      ? '외부 데이터를 수집하고 있습니다...'
-                      : 'AI 전문가 패널이 분석을 준비하고 있습니다...'}
-                  </p>
-                </div>
+                <>
+                  {status === 'enriching' ? (
+                    <EnrichmentProgress
+                      steps={enrichmentSteps.length > 0 ? enrichmentSteps : undefined}
+                      companyName={company?.name}
+                      sector={company?.sector}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <LoadingSpinner size="lg" />
+                      <p className="text-sm text-gray-500 mt-4">
+                        AI 전문가 패널이 분석을 준비하고 있습니다...
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {phaseOrder.map((phase) => {
