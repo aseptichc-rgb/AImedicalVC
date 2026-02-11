@@ -32,14 +32,30 @@ export function useAnalysis() {
 
       clearTimeout(timeoutId);
       console.log('[useAnalysis] Response received - status:', res.status);
+      console.log('[useAnalysis] Response URL:', res.url);
+      console.log('[useAnalysis] Content-Type:', res.headers.get('content-type'));
+
+      const text = await res.text();
+      console.log('[useAnalysis] Raw response (first 500 chars):', text.substring(0, 500));
+
+      // Check if response is JSON
+      if (!res.headers.get('content-type')?.includes('application/json')) {
+        console.error('[useAnalysis] Expected JSON but got:', res.headers.get('content-type'));
+        throw new Error(`서버에서 잘못된 응답을 반환했습니다. Status: ${res.status}, URL: ${res.url}`);
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error('[useAnalysis] JSON parse error:', parseErr);
+        throw new Error('서버 응답을 파싱할 수 없습니다.');
+      }
 
       if (!res.ok) {
-        const data = await res.json();
         console.error('[useAnalysis] Error response:', data);
         throw new Error(data.error || '분석 시작에 실패했습니다.');
       }
-
-      const data = await res.json();
       console.log('[useAnalysis] Success response:', data);
       const { sessionId } = data;
       console.log('[useAnalysis] Navigating to session:', sessionId);

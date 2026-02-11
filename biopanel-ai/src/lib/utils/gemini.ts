@@ -1,24 +1,41 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const apiKey = process.env.GEMINI_API_KEY || '';
+console.log('[Gemini] API Key configured:', apiKey ? `${apiKey.slice(0, 10)}...` : 'NOT SET');
+
+const genAI = new GoogleGenerativeAI(apiKey);
 
 export async function callGemini(systemPrompt: string, userMessage: string) {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    systemInstruction: systemPrompt,
-  });
+  console.log('[Gemini] Calling API...');
 
-  const result = await model.generateContent(userMessage);
-  const response = result.response;
-  const text = response.text();
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
 
-  return {
-    content: text,
-    usage: {
-      input_tokens: response.usageMetadata?.promptTokenCount || 0,
-      output_tokens: response.usageMetadata?.candidatesTokenCount || 0,
-    },
-  };
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: systemPrompt,
+    });
+
+    const result = await model.generateContent(userMessage);
+    const response = result.response;
+    const text = response.text();
+
+    console.log('[Gemini] Response received, length:', text.length);
+
+    return {
+      content: text,
+      usage: {
+        input_tokens: response.usageMetadata?.promptTokenCount || 0,
+        output_tokens: response.usageMetadata?.candidatesTokenCount || 0,
+      },
+    };
+  } catch (error: any) {
+    console.error('[Gemini] API Error:', error.message);
+    console.error('[Gemini] Full error:', error);
+    throw error;
+  }
 }
 
 export async function callGeminiWithPDF(
@@ -28,7 +45,7 @@ export async function callGeminiWithPDF(
   mimeType: string = 'application/pdf'
 ) {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     systemInstruction: systemPrompt,
   });
 
@@ -56,7 +73,7 @@ export async function callGeminiWithPDF(
 
 export async function extractPDFContent(pdfBase64: string): Promise<string> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
   });
 
   const result = await model.generateContent([
@@ -98,7 +115,7 @@ export async function analyzePDFForInvestment(
   recommendation: string;
 }> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     systemInstruction: `당신은 바이오/헬스케어 분야 전문 투자 분석가입니다.
 IR 자료를 분석하여 투자 관점에서 핵심 정보를 추출하고 평가합니다.`,
   });

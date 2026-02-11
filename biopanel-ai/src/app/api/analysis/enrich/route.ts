@@ -52,8 +52,13 @@ async function updateEnrichmentStep(
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function POST(req: NextRequest) {
+  let sessionId: string | null = null;
+  let company: any = null;
+
   try {
-    const { sessionId, company } = await req.json();
+    const body = await req.json();
+    sessionId = body.sessionId;
+    company = body.company;
 
     if (!sessionId || !company) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -194,6 +199,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, enrichedData });
   } catch (error: any) {
     console.error('Enrichment error:', error);
+
+    // Even if enrichment fails, try to move to analysis phase
+    if (sessionId) {
+      try {
+        const sessionRef = doc(db, 'analyses', sessionId);
+        await updateDoc(sessionRef, {
+          status: 'analyzing',
+          currentPhase: 'independent_analysis',
+          progress: 20,
+          updatedAt: serverTimestamp(),
+        });
+        console.log('[Enrichment] Moved to analyzing phase despite error');
+        return NextResponse.json({ success: true, partial: true });
+      } catch (fallbackError) {
+        console.error('Fallback update error:', fallbackError);
+      }
+    }
+
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
