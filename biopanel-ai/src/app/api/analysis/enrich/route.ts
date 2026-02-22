@@ -6,13 +6,16 @@ import { fetchNews } from '@/lib/data/news';
 import { fetchFDAEvents } from '@/lib/data/fda';
 import { fetchDigitalHealthData } from '@/lib/data/digital-health';
 import { enrichCompanyData } from '@/lib/data/company-info';
+import { fetchClinicalTrials } from '@/lib/data/clinical-trials';
+import { fetchPubMedArticles } from '@/lib/data/pubmed';
 
-// Helper to update enrichment step status
+// Helper to update enrichment step status with optional partial enrichedData
 async function updateEnrichmentStep(
   sessionId: string,
   stepId: string,
   status: EnrichmentStepData['status'],
-  result?: string
+  result?: string,
+  partialEnrichedData?: Partial<EnrichedData>
 ) {
   try {
     const sessionRef = doc(db, 'analyses', sessionId);
@@ -36,13 +39,30 @@ async function updateEnrichmentStep(
     const completedCount = updatedSteps.filter((s) => s.status === 'completed').length;
     const progress = Math.round((completedCount / steps.length) * 15); // 0-15% for enrichment phase
 
+    // 기존 enrichedData와 새 데이터 병합
+    const existingEnrichedData = (data.enrichedData as EnrichedData) || {
+      clinicalTrials: [],
+      recentPapers: [],
+      financials: undefined,
+      competitors: [],
+      regulatoryHistory: [],
+      news: [],
+      fdaEvents: [],
+      digitalHealthData: undefined,
+    };
+
+    const mergedEnrichedData = partialEnrichedData
+      ? { ...existingEnrichedData, ...partialEnrichedData }
+      : existingEnrichedData;
+
     await updateDoc(sessionRef, {
       enrichmentSteps: updatedSteps,
+      enrichedData: mergedEnrichedData,
       progress,
       updatedAt: serverTimestamp(),
     });
 
-    console.log(`[Enrichment] Step ${stepId} updated to ${status}`);
+    console.log(`[Enrichment] Step ${stepId} updated to ${status}`, partialEnrichedData ? '(with data)' : '');
   } catch (error) {
     console.error(`[Enrichment] Failed to update step ${stepId}:`, error);
   }
@@ -85,7 +105,8 @@ export async function POST(req: NextRequest) {
         sessionId,
         'news',
         'completed',
-        `${newsResults.length}건의 뉴스 발견`
+        `${newsResults.length}건의 뉴스 발견`,
+        { news: newsResults }
       );
     } catch (error) {
       console.error('News search error:', error);
@@ -96,13 +117,14 @@ export async function POST(req: NextRequest) {
     // Step 2: Clinical Trials
     await updateEnrichmentStep(sessionId, 'clinical', 'in_progress');
     try {
-      // ClinicalTrials.gov API call would go here
-      await delay(1500);
+      const clinicalResults = await fetchClinicalTrials(company.name);
+      enrichedData.clinicalTrials = clinicalResults;
       await updateEnrichmentStep(
         sessionId,
         'clinical',
         'completed',
-        '임상시험 데이터 수집 완료'
+        `${clinicalResults.length}건의 임상시험 발견`,
+        { clinicalTrials: clinicalResults }
       );
     } catch (error) {
       console.error('Clinical trials error:', error);
@@ -119,7 +141,8 @@ export async function POST(req: NextRequest) {
         sessionId,
         'fda',
         'completed',
-        `${fdaResults.length}건의 FDA 이벤트 발견`
+        `${fdaResults.length}건의 FDA 이벤트 발견`,
+        { fdaEvents: fdaResults }
       );
     } catch (error) {
       console.error('FDA search error:', error);
@@ -130,13 +153,16 @@ export async function POST(req: NextRequest) {
     // Step 4: PubMed Search
     await updateEnrichmentStep(sessionId, 'pubmed', 'in_progress');
     try {
-      // PubMed API call would go here
-      await delay(1500);
+      // 회사명과 섹터를 조합하여 검색
+      const searchQuery = `${company.name} ${company.sector || 'biotech'}`;
+      const pubmedResults = await fetchPubMedArticles(searchQuery);
+      enrichedData.recentPapers = pubmedResults;
       await updateEnrichmentStep(
         sessionId,
         'pubmed',
         'completed',
-        '학술 논문 검색 완료'
+        `${pubmedResults.length}건의 논문 발견`,
+        { recentPapers: pubmedResults }
       );
     } catch (error) {
       console.error('PubMed error:', error);
@@ -158,7 +184,8 @@ export async function POST(req: NextRequest) {
         sessionId,
         'financial',
         'completed',
-        '재무 데이터 분석 완료'
+        '재무 데이터 분석 완료',
+        { financials: enrichedData.financials, competitors: enrichedData.competitors }
       );
     } catch (error) {
       console.error('Financial data error:', error);
@@ -179,7 +206,8 @@ export async function POST(req: NextRequest) {
         sessionId,
         'competitor',
         'completed',
-        '경쟁사 분석 완료'
+        '경쟁사 분석 완료',
+        { digitalHealthData: enrichedData.digitalHealthData }
       );
     } catch (error) {
       console.error('Competitor analysis error:', error);

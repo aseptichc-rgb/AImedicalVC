@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { subscribeToAnalysis, subscribeToMessages, subscribeToConflicts } from '@/lib/firebase/firestore';
-import { AnalysisDoc, AnalysisStatus, MessageDoc, ConflictDoc } from '@/types/analysis';
+import { AnalysisDoc, AnalysisStatus, MessageDoc, ConflictDoc, EnrichedData } from '@/types/analysis';
 import { EnrichmentStepData } from '@/types/analysis';
 import { CompanyInput } from '@/types/company';
 
@@ -14,6 +14,7 @@ export function useDebateStream(sessionId: string) {
   const [report, setReport] = useState<any>(null);
   const [enrichmentSteps, setEnrichmentSteps] = useState<EnrichmentStepData[]>([]);
   const [company, setCompany] = useState<CompanyInput | null>(null);
+  const [enrichedData, setEnrichedData] = useState<EnrichedData | null>(null);
 
   useEffect(() => {
     console.log('[useDebateStream] Subscribing to session:', sessionId);
@@ -31,6 +32,7 @@ export function useDebateStream(sessionId: string) {
       if (data.report) setReport(data.report);
       if (data.enrichmentSteps) setEnrichmentSteps(data.enrichmentSteps);
       if (data.company) setCompany(data.company);
+      if (data.enrichedData) setEnrichedData(data.enrichedData);
     });
 
     const unsubMessages = subscribeToMessages(sessionId, (msgs) => {
@@ -48,5 +50,5 @@ export function useDebateStream(sessionId: string) {
     };
   }, [sessionId]);
 
-  return { messages, status, progress, currentPhase, conflicts, report, enrichmentSteps, company };
+  return { messages, status, progress, currentPhase, conflicts, report, enrichmentSteps, company, enrichedData };
 }

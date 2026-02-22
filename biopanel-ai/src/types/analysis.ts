@@ -156,3 +156,44 @@ export interface ConflictDoc {
   resolution?: string;
   severity: 'minor' | 'moderate' | 'major';
 }
+
+// 근거자료 (Evidence/Citation) 타입 정의
+export type EvidenceType =
+  | 'clinical_trial'    // ClinicalTrials.gov
+  | 'pubmed'            // PubMed 논문
+  | 'fda'               // FDA 데이터
+  | 'sec_filing'        // SEC 공시
+  | 'news'              // 뉴스 기사
+  | 'guideline'         // 임상 가이드라인
+  | 'conference'        // 학회 발표
+  | 'competitor_data';  // 경쟁사 데이터
+
+export type EvidenceStrength = 'high' | 'medium' | 'low';
+
+export interface Evidence {
+  id: string;
+  type: EvidenceType;
+  title: string;
+  source: string;
+  url?: string;
+  date?: string;
+  strength: EvidenceStrength;
+  excerpt?: string;          // 인용된 핵심 내용
+  relevance: string;         // 왜 이 근거가 관련있는지
+}
+
+// 근거 기반 주장 (Evidence-backed Claim)
+export interface EvidenceBackedClaim {
+  claim: string;             // 주장 내용
+  evidenceIds: string[];     // 뒷받침하는 근거 ID 목록
+  confidence: number;        // 확신도 (0-100)
+}
+
+// 확장된 구조화된 평가 (근거자료 포함)
+export interface StructuredEvalWithEvidence {
+  scores: Record<string, number>;
+  keyFindings: EvidenceBackedClaim[];
+  risks: EvidenceBackedClaim[];
+  opportunities: EvidenceBackedClaim[];
+  evidences: Evidence[];     // 분석에 사용된 모든 근거자료
+}

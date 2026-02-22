@@ -6,6 +6,7 @@ import { buildPharmacistPrompt } from './prompts/pharmacist';
 import { buildAnalystPrompt } from './prompts/analyst';
 import { buildRegulatoryPrompt } from './prompts/regulatory';
 import { buildImmunologistPrompt } from './prompts/immunologist';
+import { buildAsepticPrompt } from './prompts/aseptic';
 import { callClaude } from '../utils/claude';
 import { aggregateAgentScores, calculateOverallScore } from './evaluation/scoring';
 import { synthesizeReport } from './evaluation/synthesis';
@@ -49,6 +50,8 @@ function buildPrompt(agentId: AgentId, company: CompanyInput, enrichedData: Enri
       return buildRegulatoryPrompt(company, enrichedData, phase);
     case 'immunologist':
       return buildImmunologistPrompt(company, enrichedData, phase);
+    case 'aseptic':
+      return buildAsepticPrompt(company, enrichedData, phase);
     default:
       throw new Error(`Unknown agent: ${agentId}`);
   }
@@ -62,23 +65,76 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function parseStructuredOutput(narrative: string): AgentAnalysisResult['structured'] {
-  const defaultStructured = {
+interface StructuredOutput {
+  scores: Record<string, number>;
+  keyFindings: Array<{ claim: string; evidenceIds: string[]; confidence: number } | string>;
+  risks: Array<{ claim: string; evidenceIds: string[]; confidence: number } | string>;
+  opportunities: Array<{ claim: string; evidenceIds: string[]; confidence: number } | string>;
+  evidences?: Array<{
+    id: string;
+    type: string;
+    title: string;
+    source: string;
+    url?: string;
+    date?: string;
+    strength: string;
+    excerpt?: string;
+    relevance: string;
+  }>;
+}
+
+function parseStructuredOutput(narrative: string): StructuredOutput {
+  const defaultStructured: StructuredOutput = {
     scores: {},
     keyFindings: [],
     risks: [],
     opportunities: [],
+    evidences: [],
   };
 
   try {
     const jsonMatch = narrative.match(/```json\n?([\s\S]*?)```/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[1]);
+
+      // 근거자료 파싱
+      const evidences = Array.isArray(parsed.evidences) ? parsed.evidences.map((e: any) => ({
+        id: e.id || `E${Math.random().toString(36).substr(2, 5)}`,
+        type: e.type || 'unknown',
+        title: e.title || '',
+        source: e.source || '',
+        url: e.url,
+        date: e.date,
+        strength: e.strength || 'medium',
+        excerpt: e.excerpt,
+        relevance: e.relevance || '',
+      })) : [];
+
+      // 주장 파싱 (새 형식과 기존 형식 모두 지원)
+      const parseClaimsArray = (arr: any[]): Array<{ claim: string; evidenceIds: string[]; confidence: number } | string> => {
+        if (!Array.isArray(arr)) return [];
+        return arr.map(item => {
+          if (typeof item === 'string') {
+            // 기존 형식: 문자열 배열
+            return item;
+          } else if (item && typeof item === 'object' && item.claim) {
+            // 새 형식: 근거 기반 주장
+            return {
+              claim: item.claim,
+              evidenceIds: Array.isArray(item.evidenceIds) ? item.evidenceIds : [],
+              confidence: typeof item.confidence === 'number' ? item.confidence : 50,
+            };
+          }
+          return String(item);
+        });
+      };
+
       return {
         scores: parsed.scores || {},
-        keyFindings: parsed.keyFindings || [],
-        risks: parsed.risks || [],
-        opportunities: parsed.opportunities || [],
+        keyFindings: parseClaimsArray(parsed.keyFindings),
+        risks: parseClaimsArray(parsed.risks),
+        opportunities: parseClaimsArray(parsed.opportunities),
+        evidences,
       };
     }
   } catch {
@@ -129,6 +185,7 @@ async function runIndependentAnalysis(
   enrichedData: EnrichedData
 ): Promise<AgentAnalysisResult> {
   const agent = getAgent(agentId);
+  if (!agent) throw new Error(`Agent not found: ${agentId}`);
   const prompt = buildPrompt(agentId, company, enrichedData, 'independent_analysis');
 
   const { content, tokenCount } = await callClaude(
@@ -157,6 +214,7 @@ async function runCrossExamination(
   conflicts: DetectedConflict[]
 ): Promise<RebuttalResult> {
   const agent = getAgent(agentId);
+  if (!agent) throw new Error(`Agent not found: ${agentId}`);
 
   const relevantConflicts = conflicts.filter((c) =>
     c.agentPositions.some((p) => p.agentId === agentId)
@@ -165,6 +223,7 @@ async function runCrossExamination(
   const otherSummaries = otherAnalyses
     .map((o) => {
       const otherAgent = getAgent(o.agentId);
+      if (!otherAgent) return `[Unknown Agent]\n${o.analysis.narrative.substring(0, 1500)}...`;
       return `[${otherAgent.name} (${otherAgent.nameEn}) - ${otherAgent.title}]\n${o.analysis.narrative.substring(0, 1500)}...`;
     })
     .join('\n\n---\n\n');
@@ -229,6 +288,7 @@ async function runFinalVerdict(
   rebuttal: RebuttalResult
 ): Promise<VerdictResult> {
   const agent = getAgent(agentId);
+  if (!agent) throw new Error(`Agent not found: ${agentId}`);
 
   const prompt = `당신은 ${agent.name}입니다. 독립 분석과 교차 검토 토론을 거친 후, 최종 의견을 제시하세요.
 
@@ -297,8 +357,8 @@ async function writeDebateMessage(
     .collection('debate')
     .add({
       agentId,
-      agentName: agent.name,
-      agentColor: agent.color,
+      agentName: agent?.name || agentId,
+      agentColor: agent?.color || '#6B7280',
       phase,
       content,
       metadata: metadata || {},
@@ -355,7 +415,7 @@ export async function orchestrate(
       phase: 'independent_analysis',
       step: 2,
       totalSteps,
-      message: '5명의 전문가가 독립적으로 분석 중입니다...',
+      message: '6명의 전문가가 독립적으로 분석 중입니다...',
     });
     await updateSessionPhase(sessionId, 'independent_analysis', 20);
 
@@ -366,7 +426,7 @@ export async function orchestrate(
         phase: 'independent_analysis',
         step: 2,
         totalSteps,
-        message: `${getAgent(agentId).name}이(가) 분석 중입니다...`,
+        message: `${getAgent(agentId)?.name || agentId}이(가) 분석 중입니다...`,
         agentId,
       });
 
@@ -445,7 +505,7 @@ export async function orchestrate(
         phase: 'cross_examination',
         step: 4,
         totalSteps,
-        message: `${getAgent(agentId).name}이(가) 반론을 준비 중입니다...`,
+        message: `${getAgent(agentId)?.name || agentId}이(가) 반론을 준비 중입니다...`,
         agentId,
       });
 
@@ -490,7 +550,7 @@ export async function orchestrate(
         phase: 'final_verdict',
         step: 5,
         totalSteps,
-        message: `${getAgent(agentId).name}이(가) 최종 의견을 제출 중입니다...`,
+        message: `${getAgent(agentId)?.name || agentId}이(가) 최종 의견을 제출 중입니다...`,
         agentId,
       });
 
@@ -547,12 +607,16 @@ export async function orchestrate(
         avgScore >= 60 ? 'positive' :
         avgScore >= 40 ? 'neutral' :
         avgScore >= 20 ? 'negative' : 'strong_negative';
+      const firstFinding = v.verdict.structured.keyFindings[0];
+      const keyArgument = typeof firstFinding === 'string'
+        ? firstFinding
+        : (firstFinding?.claim || '');
       return {
         agentId: v.agentId,
-        agentName: getAgent(v.agentId).name,
+        agentName: getAgent(v.agentId)?.name || v.agentId,
         verdict: verdictType as 'strong_positive' | 'positive' | 'neutral' | 'negative' | 'strong_negative',
         summary: v.verdict.content.substring(0, 500),
-        keyArgument: v.verdict.structured.keyFindings[0] || '',
+        keyArgument,
         confidenceLevel: Math.round(avgScore),
       };
     });
