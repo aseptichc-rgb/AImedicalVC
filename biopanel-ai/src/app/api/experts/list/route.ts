@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { getAdminServices } from '@/lib/firebase/admin';
 
 export async function GET(req: NextRequest) {
   try {
+    const { adminDb } = getAdminServices();
     const { searchParams } = new URL(req.url);
     const specialty = searchParams.get('specialty');
 
